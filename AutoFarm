@@ -1,0 +1,179 @@
+local scriptEnabled = false
+local processedModels = {}
+local monsterDetected = false
+
+local function teleportToModel(model)
+    local character = game.Players.LocalPlayer.Character
+    if character and character:FindFirstChild("HumanoidRootPart") then
+        local primaryPart = model.PrimaryPart or model:FindFirstChildWhichIsA("BasePart")
+        if primaryPart then
+            character.HumanoidRootPart.CFrame = primaryPart.CFrame
+        end
+    end
+end
+
+local function triggerProximityPrompt(prompt, holdTime)
+    if prompt and prompt:IsA("ProximityPrompt") then
+        if prompt.HoldDuration > 0 then
+            fireproximityprompt(prompt, 0)
+            wait(holdTime or prompt.HoldDuration)
+            fireproximityprompt(prompt, 1)
+        else
+            fireproximityprompt(prompt)
+        end
+    end
+end
+
+local function processHighlightedModels(modelsToHighlight, excludeModels)
+    local allModels = game.Workspace:GetDescendants()
+    for _, object in ipairs(allModels) do
+        if object:IsA("Model") and table.find(modelsToHighlight, object.Name) and not table.find(excludeModels, object.Name) and not processedModels[object] then
+            if not object:FindFirstChildOfClass("Highlight") then
+                local highlight = Instance.new("Highlight")
+                highlight.Parent = object
+                highlight.FillColor = Color3.new(1, 1, 0)
+                highlight.OutlineColor = Color3.new(0, 0, 0)
+            end
+
+            local hasProximityPrompt = false
+            for _, descendant in ipairs(object:GetDescendants()) do
+                if descendant:IsA("ProximityPrompt") then
+                    hasProximityPrompt = true
+                    break
+                end
+            end
+
+            if hasProximityPrompt then
+                teleportToModel(object)
+                wait(0.1)
+                for _, descendant in ipairs(object:GetDescendants()) do
+                    if descendant:IsA("ProximityPrompt") then
+                        triggerProximityPrompt(descendant, 1)
+                        wait(1)
+                    end
+                end
+                processedModels[object] = true
+            end
+        end
+    end
+end
+
+local function processHighlightedDoors()
+    local doorsToHighlight = {"NormalDoor"}
+    local allModels = game.Workspace:GetDescendants()
+    for _, object in ipairs(allModels) do
+        if object:IsA("Model") and table.find(doorsToHighlight, object.Name) and not processedModels[object] then
+            if not object:FindFirstChildOfClass("Highlight") then
+                local highlight = Instance.new("Highlight")
+                highlight.Parent = object
+                highlight.FillColor = Color3.new(1, 1, 0)
+                highlight.OutlineColor = Color3.new(0, 0, 0)
+            end
+
+            for _, part in ipairs(object:GetDescendants()) do
+                if part:IsA("BasePart") then
+                    part.BrickColor = BrickColor.new("Bright red")
+                end
+            end
+
+            local hasProximityPrompt = false
+            for _, descendant in ipairs(object:GetDescendants()) do
+                if descendant:IsA("ProximityPrompt") then
+                    hasProximityPrompt = true
+                    break
+                end
+            end
+
+            if hasProximityPrompt then
+                teleportToModel(object)
+                wait(0.1)
+                for _, descendant in ipairs(object:GetDescendants()) do
+                    if descendant:IsA("ProximityPrompt") then
+                        triggerProximityPrompt(descendant, 1)
+                        wait(1)
+                    end
+                end
+                processedModels[object] = true
+            end
+        end
+    end
+end
+
+local function teleportAndTrigger()
+    local modelsToHighlight = {
+        "Flashlight", "NormalKeyCard", "Lantern", "Medkit", "WindupLight", "CodeBreacher",
+        "50Currency", "10Currency", "15Currency", "20Currency", "25Currency", "30Currency", 
+        "40Currency", "35Currency", "45Currency"
+    }
+    local excludeModels = {"NormalDoor"}
+
+    processHighlightedModels(modelsToHighlight, excludeModels)
+    processHighlightedDoors()
+end
+
+local function toggleScript()
+    scriptEnabled = not scriptEnabled
+    if scriptEnabled then
+        print("Script enabled")
+        while scriptEnabled do
+            teleportAndTrigger()
+            wait(1)
+        end
+    else
+        print("Script disabled")
+    end
+end
+
+local function hideInLocker()
+    local lockers = {}
+    for _, object in ipairs(game.Workspace:GetDescendants()) do
+        if object:IsA("Model") and object.Name == "Locker" then
+            table.insert(lockers, object)
+        end
+    end
+
+    if #lockers > 0 then
+        local randomLocker = lockers[math.random(1, #lockers)]
+        teleportToModel(randomLocker)
+        for _, descendant in ipairs(randomLocker:GetDescendants()) do
+            if descendant:IsA("ProximityPrompt") then
+                triggerProximityPrompt(descendant, 1)
+                break
+            end
+        end
+    end
+end
+
+-- GUI oluşturma
+local ScreenGui = Instance.new("ScreenGui")
+local ToggleButton = Instance.new("TextButton")
+local HideButton = Instance.new("TextButton")
+
+ScreenGui.Parent = game.Players.LocalPlayer:WaitForChild("PlayerGui")
+
+ToggleButton.Size = UDim2.new(0, 200, 0, 50)
+ToggleButton.Position = UDim2.new(1, -210, 0, 10)
+ToggleButton.Text = "Start Auto Farm"
+ToggleButton.Parent = ScreenGui
+
+HideButton.Size = UDim2.new(0, 200, 0, 50)
+HideButton.Position = UDim2.new(1, -210, 0, 70)
+HideButton.Text = "Hide in Locker"
+HideButton.Parent = ScreenGui
+
+ToggleButton.MouseButton1Click:Connect(function()
+    toggleScript()
+end)
+
+HideButton.MouseButton1Click:Connect(function()
+    hideInLocker()
+end)
+
+-- Monster spawn algılama
+workspace.ChildAdded:Connect(function(inst)
+    if inst.Name == "Angler" then
+        print("Monster detected!")
+        monsterDetected = true
+        -- Ekstra işlem yapmak isterseniz buraya ekleyebilirsiniz
+    end
+end)
